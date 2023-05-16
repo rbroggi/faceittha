@@ -1,0 +1,138 @@
+
+version: '3.8'
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    networks:
+      - test
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "log_statement=all"
+
+  debezium:
+    image: debezium/server:2.3
+    depends_on:
+      - db
+      - pubsub
+    networks:
+      - test
+    environment:
+      - DEBEZIUM_SINK_TYPE=pubsub
+      - DEBEZIUM_SINK_PUBSUB_PROJECT_ID=faceittha
+      - DEBEZIUM_SINK_PUBSUB_ADDRESS=pubsub:8085
+      - DEBEZIUM_SINK_EMULATOR_HOST=pubsub:8085
+      - PUBSUB_EMULATOR_HOST=pubsub:8085
+      - DEBEZIUM_SOURCE_CONNECTOR_CLASS=io.debezium.connector.postgresql.PostgresConnector
+      - DEBEZIUM_SOURCE_OFFSET_STORAGE_FILE_FILENAME=data/offsets.dat
+      - DEBEZIUM_SOURCE_OFFSET_FLUSH_INTERVAL_MS=0
+      - DEBEZIUM_SOURCE_DATABASE_HOSTNAME=db
+      - DEBEZIUM_SOURCE_DATABASE_PORT=5432
+      - DEBEZIUM_SOURCE_DATABASE_USER=postgres
+      - DEBEZIUM_SOURCE_DATABASE_PASSWORD=postgres
+      - DEBEZIUM_SOURCE_DATABASE_DBNAME=postgres
+      - DEBEZIUM_SOURCE_TOPIC_PREFIX=cdc
+      - DEBEZIUM_SOURCE_TABLE_INCLUDE_LIST=faceittha.users
+      - DEBEZIUM_SOURCE_PLUGIN_NAME=pgoutput
+      - DEBEZIUM_SOURCE_TOMBSTONES_ON_DELETE=false
+
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:latest
+    networks:
+      - test
+    command:
+      - gcloud 
+      - beta 
+      - emulators 
+      - pubsub 
+      - start 
+      - --project=faceittha
+      - --host-port=0.0.0.0:8085
+
+  test:
+    image: golang:1.20
+    networks:
+      - test
+    depends_on:
+      - db
+      - pubsub 
+      - debezium
+    volumes:
+      - .:/go/src/app
+    working_dir: /go/src/app
+    environment:
+      - POSTGRESQL_URL=postgres://postgres:postgres@db:5432/postgres?sslmode=disable
+      - PUBSUB_EMULATOR_HOST=pubsub:8085
+      - GOCOVERDIR=coverage
+      - CGO_ENABLED=0
+    command: 
+      - /bin/bash
+      - -c
+      - |
+        mkdir -p coverage
+        rm coverage/*
+
+        echo "building binaries with coverage support..."
+        go build -buildvcs=false -cover -o ./bin/servercvg ./cmd/server || exit 1
+        go build -buildvcs=false -cover -o ./bin/waitforcvg ./cmd/waitfor || exit 1
+        go build -buildvcs=false -cover -o ./bin/migratecvg ./cmd/migrate || exit 1
+        go build -buildvcs=false -cover -o ./bin/pubsubsetupcvg ./cmd/pubsubsetup || exit 1
+        go build -buildvcs=false -cover -o ./bin/workercvg ./cmd/worker || exit 1
+
+        echo "wating db to be ready..."
+        ./bin/waitforcvg -host=db -port=5432 || exit 1
+        echo "wating pubsub to be ready..."
+        ./bin/waitforcvg -host=pubsub -port=8085 || exit 1
+
+        echo "setup database by running migrations"
+        ./bin/migratecvg || exit 1
+
+        echo "setup pubusub - creationg of topics and subscriptions"
+        ./bin/pubsubsetupcvg "faceittha,cdc.faceittha.users:worker.cdc.faceittha.users.sub,shared.faceittha.UserEvents:test.shared.facittha.UserEvents.sub" || exit 1
+
+        echo "starting unit-tests"
+        go test -cover ./... -args -test.gocoverdir="$$PWD/coverage" || exit 1
+        echo "tests passed"
+
+        echo "starting server"
+        ./bin/servercvg &> /tmp/server.log &
+        serverPID=$$(echo $$!)
+        echo "server PID: $$serverPID"
+
+        echo "starting worker"
+        ./bin/workercvg &> /tmp/worker.log &
+        workerPID=$$(echo $$!)
+        echo "worker PID: $$workerPID"
+
+        echo "wating server to be ready..."
+        ./bin/waitforcvg -host=localhost -port=50051 || exit 1
+        echo "wating worker to be ready..."
+        ./bin/waitforcvg -host=localhost -port=50052 || exit 1
+
+        echo "starting component tests..."
+        go test -v -tags=component ./tests/component || exit 1
+
+        echo "stop server"
+        kill $${serverPID}
+        echo "stop worker"
+        kill $${workerPID}
+
+        echo "waiting for server to stop"
+        wait $${serverPID}
+        echo "waiting for worker to stop"
+        wait $${workerPID}
+
+        sleep 5
+        
+        go tool covdata percent -i=./coverage
+
+
+networks:
+  test:

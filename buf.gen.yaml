@@ -1,0 +1,25 @@
+version: v1
+managed:
+  enabled: true
+  go_package_prefix:
+    default: github.com/rbroggi/faceittha/pkg/sdk/v1
+    except:
+      - buf.build/googleapis/googleapis
+      - buf.build/envoyproxy/protoc-gen-validate
+      - buf.build/grpc-ecosystem/grpc-gateway
+plugins:
+  # The protoc-gen-go stubs are required for grpc-go
+  - plugin: buf.build/protocolbuffers/go:v1.28.1
+    out: pkg/sdk/v1
+    opt: paths=source_relative
+  - plugin: buf.build/bufbuild/validate-go:v1.0.1
+    out: pkg/sdk/v1
+    opt: paths=source_relative
+  - plugin: buf.build/grpc/go
+    out: pkg/sdk/v1
+    opt: paths=source_relative
+  - plugin: buf.build/grpc-ecosystem/gateway:v2.15.2 
+    out: pkg/sdk/v1
+    opt: paths=source_relative
+  - plugin: buf.build/grpc-ecosystem/openapiv2:v2.15.2
+    out: openapiv2

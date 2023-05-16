@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+option go_package = "github.com/rbroggi/faceittha/pkg/sdk/v1";
+
+import "google/api/annotations.proto";
+
+// The health service definition.
+service HealthService {
+  // Exposes a Health endpoint for the service.
+  rpc Healthz(HealthzRequest) returns (HealthzResponse) {
+    option (google.api.http) = {
+      get: "/v1/healthz"
+    };
+  }
+}
+
+message HealthzRequest {}
+
+message HealthzResponse {
+    // Is the health status description. This will typically be "OK". 
+    //
+    // Consumers are encourage to depend only on the returned HTTP status code. 
+    string status = 1;
+}

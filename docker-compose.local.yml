@@ -1,0 +1,31 @@
+
+version: '3.8'
+services:
+  db:
+    ports:
+      - '5432:5432'
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "log_statement=all"
+
+  pubsub:
+    ports:
+      - '8085:8085'
+
+  test:
+    command: 
+      - /bin/bash
+      - -c
+      - |
+        echo "wating db to be ready..."
+        go run -mod=vendor ./cmd/waitfor/main.go -host=db -port=5432 || exit 1
+        echo "wating pubsub to be ready..."
+        go run -mod=vendor ./cmd/waitfor/main.go -host=pubsub -port=8085 || exit 1
+        echo "setup database by running migrations"
+        go run -mod=vendor ./cmd/migrate/main.go || exit 1
+        echo "setup pubsub topics and subscriptions"
+        go run -mod=vendor ./cmd/pubsubsetup/main.go "faceittha,cdc.faceittha.users:worker.cdc.faceittha.users.sub,shared.faceittha.UserEvents:test.shared.facittha.UserEvents.sub" || exit 1
+        echo "dependencies configured, up and running"
