@@ -197,3 +197,31 @@ There are 2 ways you can run all the tests in the repo:
 
 1. locally [only need docker]: `make ci`
 2. I have added a github action for doing that if you want to check out the output of the test.
+
+## Start the application locally for interacting with it
+
+1. start dependencies: `make dependencies_up`
+2. in a first shell start the server `go run cmd/server/main.go`
+3. in a second shell start the worker `PUBSUB_EMULATOR_HOST=localhost:8085 go run cmd/worker/main.go`
+4. you can send curl requests to the server application thanks to the http transcoding. See below a create, update, list, delete, list sample
+```sh
+➜ curl -X POST http://localhost:8080/v1/users -H 'Content-Type: application/json' -d '{"first_name": "John","last_name": "Doe","nickname": "johndoe","password": "password123","email": "johndoe@example.com","country": "US"}'
+
+{"user":{"id":"1e07c517-473d-4732-bbee-0f9251dd4b6d","firstName":"John","lastName":"Doe","nickname":"johndoe","email":"johndoe@example.com","country":"US","createdAt":"2023-05-16T17:06:41.788042094Z","updatedAt":"2023-05-16T17:06:41.788042294Z"}}
+
+➜ curl -X PUT http://localhost:8080/v1/users/1e07c517-473d-4732-bbee-0f9251dd4b6d -H 'Content-Type: application/json' -d '{"first_name": "Mark","country": "BR"}'
+
+{"user":{"id":"1e07c517-473d-4732-bbee-0f9251dd4b6d","firstName":"Mark","lastName":"Doe","nickname":"johndoe","email":"johndoe@example.com","country":"BR","createdAt":"2023-05-16T17:06:41.788042Z","updatedAt":"2023-05-16T17:07:41.526247896Z"}}
+
+➜ curl -X GET http://localhost:8080/v1/users -H 'Content-Type: application/json' 
+
+{"users":[{"id":"1e07c517-473d-4732-bbee-0f9251dd4b6d","firstName":"Mark","lastName":"Doe","nickname":"johndoe","email":"johndoe@example.com","country":"BR","createdAt":"2023-05-16T17:06:41.788042Z","updatedAt":"2023-05-16T17:07:41.526248Z"}]}
+
+-> curl -X DELETE http://localhost:8080/v1/users/1e07c517-473d-4732-bbee-0f9251dd4b6d
+
+{}
+
+➜ curl -X GET http://localhost:8080/v1/users -H 'Content-Type: application/json' 
+
+{"users":[]}
+```
