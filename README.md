@@ -91,7 +91,14 @@ There are 2 techniques that are pretty common to implement pagination: offset-ba
 
 Withing this simple project, I did not bother creating a sophisticated wiring or DI (dependency-injection) mechanism featuring factories and so on. All the concrete implementations are instantiated in the `main.go` file and wired into the dependant service. This rudimentary DI mechanism still follows the go idiom [accept interfaces and return structures](https://bryanftan.medium.com/accept-interfaces-return-structs-in-go-d4cab29a301b). There is also an argument to be made in the microservice world that if the wiring of a service starts to become too complex and verbose, maybe it's a sign that your service might be crossing the micro-macro-service border :sweat_smile: and could be a good time to start considering splitting it (or not :sweat_smile:).
 
-### CDC - Change data [capture](https://en.wikipedia.org/wiki/Change_data_capture)
+### CDC - [Change data capture](https://en.wikipedia.org/wiki/Change_data_capture)
+
+One of the THA requirements was to emit events when a user is created/updated/deleted. I considered two possible approaches to that:
+
+1. Outbox pattern;
+2. CDC; 
+
+I have opted for the CDC for the following reasons:
 
 1. better horizontal scalability than outbox - different consumer pods can split work easily than a cron schedule. 
 2. data is streamed as it is committed to the db (to potentially multiple pods) which spread the resources-load (network, cpu, etc) compared to a bulk-job.
@@ -135,11 +142,11 @@ Withing this simple project, I did not bother creating a sophisticated wiring or
 
 I made the code quite silent in terms of logging - the service will basically only log unexpected server errors. This goes also hand-in-hand with how I have done error-handling:
 
-if an error is not recoverable it will be returned (more frequently than not wrappedL) to the caller. If the error reaches the top of the applicative call-stack (grpc server or pubsub consumer), 
+if an error is not recoverable it will be returned (more frequently than not wrapped) to the caller. If the error reaches the top of the applicative call-stack (grpc server or pubsub consumer), 
 the error will be logged and translated to proper protocol-specific error (grpc/http status code). 
 The minimal presence of logs is a deliberate choice and the goal with it would be: 
 1. avoid creating noise that makes production issues investigation harder (specially in microservice world where an investigation typically involves several services);
-2. make the code more easier to read - more concise and with less distractions to the reader;
+2. make the code easier to read - more concise and with less distractions to the reader;
 3. [bonus] log can became quite expensive in the cloud when ingested by vendors;
 
 ### BDD and component tests
