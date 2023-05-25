@@ -225,3 +225,20 @@ There are 2 ways you can run all the tests in the repo:
 
 {"users":[]}
 ```
+
+## Shortcomings
+
+1. Monitoring - a production-ready system should feature at least the minimal set of metrics/traces and other service health signs. 
+Typically: 
+    1. latency - (gauges) to be transformed in a latency distribution and visualise p95, p99 service latency
+    1. Go runtime metrics - memory, cpu, GC 
+2. Validation - some functional validation as discussed above 
+    1. (pwd) = minimal requirements 
+    1. username/nickname uniqueness assessment
+    1. PII data treatment
+3. Client-facing error specifications: who is the client (internal/external/trusted/untrusted) - can the service disclose sensitive info e.g. NOT_FOUND, or will that lead to potential mapping attacks by untrusted clients?
+4. Proto linting - buf allows for backward/forward compatibility assessments while linting the protobuf specs.  
+5. Vulnerability / dependency scans - go.mod can be inspected for usage of dependencies that could make the software vulnerable
+6. Pagination can be done using cursor-based technique if performance becomes a concern
+7. Pack the application in a container image which can be published to register and easily trackable.
+8. Uniform configuration management - in some parts of the code I have mixed configuration passing between env vars and command line arguments. uniforming that would be desirable and I would prefer ENV var (12-factor app).
