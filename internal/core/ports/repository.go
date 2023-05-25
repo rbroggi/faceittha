@@ -12,8 +12,8 @@ import (
 type Repository interface {
 	// SaveUser durably saves the user.
 	SaveUser(ctx context.Context, user *model.User) error
-	
-	// UpdateUser updates the user and saves the state in the persistence layer. 
+
+	// UpdateUser updates the user and saves the state in the persistence layer.
 	// All the non-zero values specified will be updated.
 	UpdateUser(ctx context.Context, user *model.User) error
 
@@ -33,25 +33,25 @@ type ListUsersQuery struct {
 	Countries []string
 
 	// CreatedAfter is the left time boundary in which the user was created. Zero-value will be ignored as filter.
-	CreatedAfter time.Time 
+	CreatedAfter time.Time
 
 	// CreatedBefore is the right time boundary in which the user was created. Zero-value will be ignored as filter.
 	CreatedBefore time.Time
 
 	// Limit is the maximum amount of users to return (for pagination). Zero-value will be interpreted as no-limit.
-	Limit uint32 
+	Limit uint32
 
 	// Offset is the offset to apply (for pagination). Zero-value will be interpreted as 0 Offset.
 	Offset uint32
 }
 
-// ListUsersResult gathers the result 
+// ListUsersResult gathers the result
 type ListUsersResult struct {
 	// Users are the users matching the query parameters
 	Users []model.User
 }
 
-// DeleteUserQuery 
+// DeleteUserQuery
 type DeleteUserQuery struct {
 	// ID is the ID of the user to be deleted
 	ID uuid.UUID

@@ -77,7 +77,7 @@ services:
       - -c
       - |
         mkdir -p coverage
-        rm coverage/*
+        rm -r coverage/*
 
         echo "building binaries with coverage support..."
         go build -buildvcs=false -cover -o ./bin/servercvg ./cmd/server || exit 1
@@ -132,6 +132,9 @@ services:
         sleep 5
         
         go tool covdata percent -i=./coverage
+        mkdir coverage/merged
+        go tool covdata merge -i=coverage -o coverage/merged
+        go tool covdata textfmt -i=coverage/merged -o=coverage/merged/report.out
 
 
 networks:

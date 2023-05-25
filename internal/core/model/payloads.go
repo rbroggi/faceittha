@@ -9,27 +9,27 @@ import (
 // CreateUserArgs contain the arguments of the CreateUser method.
 type CreateUserArgs struct {
 	// FirstName is the user first name.
-	FirstName string 
+	FirstName string
 
 	// LastName is the user last name.
-	LastName string 
+	LastName string
 
 	// Nickname is the user nickname
-	Nickname string 
+	Nickname string
 
 	// Email is the user email
-	Email string 
+	Email string
 
-	// Password is the user password. 
-	Password string 
+	// Password is the user password.
+	Password string
 
 	// Country is the user country
-	Country string 
+	Country string
 }
 
 // CreateUserResponse contains the response of the CreateUser method.
 type CreateUserResponse struct {
-	// User 
+	// User
 	User User
 }
 
@@ -42,19 +42,19 @@ type ListUsersArgs struct {
 	Countries []string
 
 	// CreatedAfter is the left time boundary in which the user was created. Zero-value will be ignored as filter.
-	CreatedAfter time.Time 
+	CreatedAfter time.Time
 
 	// CreatedBefore is the right time boundary in which the user was created. Zero-value will be ignored as filter.
 	CreatedBefore time.Time
 
 	// Limit is the maximum amount of users to return (for pagination). Zero-value will be interpreted as no-limit.
-	Limit uint32 
+	Limit uint32
 
 	// Offset is the offset to apply (for pagination). Zero-value will be interpreted as 0 Offset.
 	Offset uint32
 }
 
-// ListUsersResponse contains the users matching the input query of the ListUsers api. 
+// ListUsersResponse contains the users matching the input query of the ListUsers api.
 type ListUsersResponse struct {
 	// Users are the users matching the ListUsers query.
 	Users []User
@@ -65,10 +65,9 @@ type DeleteUserArgs struct {
 	// ID is the id of the user to be deleted.
 	ID uuid.UUID
 
-	// HardDelete instructs the deletion to be a hard deletion (true). Otherwise a soft-copy will be kept.
+	// HardDelete instructs the deletion to be a hard deletion (true). Otherwise, a soft-copy will be kept.
 	HardDelete bool
 }
-
 
 // UpdateUserArgs contain the arguments of the UpdateUser method.
 type UpdateUserArgs struct {
@@ -76,23 +75,23 @@ type UpdateUserArgs struct {
 	ID uuid.UUID
 
 	// FirstName is the user first name.
-	FirstName string 
+	FirstName string
 
 	// LastName is the user last name.
-	LastName string 
+	LastName string
 
 	// Nickname is the user nickname
-	Nickname string 
+	Nickname string
 
 	// Email is the user email
-	Email string 
+	Email string
 
 	// Country is the user country
-	Country string 
+	Country string
 }
 
 // UpdateUserResponse contains the response of the UpdateUser method.
 type UpdateUserResponse struct {
-	// User 
+	// User
 	User User
 }
