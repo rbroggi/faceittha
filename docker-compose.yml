@@ -110,7 +110,6 @@ services:
         ./bin/workercvg &> /tmp/worker.log &
         workerPID=$$(echo $$!)
         echo "worker PID: $$workerPID"
-
         echo "wating server to be ready..."
         ./bin/waitforcvg -host=localhost -port=50051 || exit 1
         echo "wating worker to be ready..."

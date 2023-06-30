@@ -15,7 +15,6 @@ func (s *ComponentTestSuite) TestCreateUser() {
 		anEventForTheUserCreationWillEventuallyBeProduced()
 }
 
-
 func (s *ComponentTestSuite) TestUpdateUser() {
 	given, when, then := s.gherkin()
 

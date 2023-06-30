@@ -217,7 +217,7 @@ There are 2 ways you can run all the tests in the repo:
 
 {"users":[{"id":"1e07c517-473d-4732-bbee-0f9251dd4b6d","firstName":"Mark","lastName":"Doe","nickname":"johndoe","email":"johndoe@example.com","country":"BR","createdAt":"2023-05-16T17:06:41.788042Z","updatedAt":"2023-05-16T17:07:41.526248Z"}]}
 
--> curl -X DELETE http://localhost:8080/v1/users/1e07c517-473d-4732-bbee-0f9251dd4b6d
+➜ curl -X DELETE http://localhost:8080/v1/users/1e07c517-473d-4732-bbee-0f9251dd4b6d
 
 {}
 
@@ -228,10 +228,17 @@ There are 2 ways you can run all the tests in the repo:
 
 ## Shortcomings
 
-1. Monitoring - a production-ready system should feature at least the minimal set of metrics/traces and other service health signs. 
+1. Monitoring - a production-ready system should feature at least the minimal set of metrics/traces and other service health signs. SLOs/SLIs would also be a good way to framing the discussion and prioritisation of metrics that we would like to track.
 Typically: 
-    1. latency - (gauges) to be transformed in a latency distribution and visualise p95, p99 service latency
-    1. Go runtime metrics - memory, cpu, GC 
+    1. [SLI] latency - (gauges) to be transformed in a latency distribution and visualise p95, p99 service latency.
+    1. [SLO example] server-side (no network round-trips) measured p99 latency over a 24h rolling window should not exceed 500ms. 
+    1. [SLI] uptime - uptime can be measured in time or as a ratio of (1 - (5XX codes responses)/(total responses)).
+    1. [SLO example] uptime should not be smaller than 99.9% over a rolling window of 7days. 
+    1. [SLI] message-broker topic non-acked messages.
+    1. [SLO] non-acked messages in the CDC topic should not grow over 500.
+    1. [SLI] older non-acked message life (measured in ms from publish-time)
+    1. [SLO] older non-acked message life should not be greater than 5 minutes. 
+    1. Go runtime metrics - memory, cpu, GC and other metrics could be gathered on a separated dashboard which would be used for investigations/deploy-monitoring rather than for alerts/on-call.
 2. Validation - some functional validation as discussed above 
     1. (pwd) = minimal requirements 
     1. username/nickname uniqueness assessment
@@ -242,3 +249,15 @@ Typically:
 6. Pagination can be done using cursor-based technique if performance becomes a concern
 7. Pack the application in a container image which can be published to register and easily trackable.
 8. Uniform configuration management - in some parts of the code I have mixed configuration passing between env vars and command line arguments. uniforming that would be desirable and I would prefer ENV var (12-factor app).
+9. In this solution, I have adopted the client-lib defaults in pub-sub and grpc for timeouts/retrial policies, etc. In a real-world application
+   A more in-depth analysis should be conducted to tune those policies to the application non-functional requirements. 
+10. Also in pubsub producer/subscriber I have not handled the different kinds of errors in the same way I would have for a real-world application - 
+   some errors are retriable/transient and others are not. The application should/could better handle those. Example of transient errors 
+   could be seen through timeouts and examples of non-transient could be seen in IAM permission issues. In pubsub, by default msgs are retried 
+   indefinitely following the retrial policy, if we want to make the delivery to give-up after a maximum retrial attempts we should configure a
+   dead-letter topic for the subscription.
+11. I have also not considered or thought about message ordering guarantees - in a real-life application this is very important. Similarly to kafka, 
+   in pubsub ordering-keys need to be used to enforce messages to be ordered (ordering can only be enforced within a given ordering-key).
+12. No forward/backward compatibility linting process has been implemented for the proto-schema. This could lead to dangerous effects. In a real-world scenario:
+   1. schema change non-backward compatible - breaks the decoding of the subscriber 
+   1. schema change that simply inverts the order of two equaly-sized attributes is considered by the subscriber as backward-compatible and nothing breaks but there are some silent functional errors produced. (e.g. swap nickname with firstname)
