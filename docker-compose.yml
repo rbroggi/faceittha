@@ -2,46 +2,27 @@
 version: '3.8'
 services:
   db:
-    image: postgres:15-alpine
+    image: mongo
     restart: always
     networks:
       - test
+    volumes:
+      - ./db/config/keyfile:/opt/keyfile/keyfile:ro
+#      - ./db/init.js:/docker-entrypoint-initdb.d/init.js:ro
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=postgres
-    command:
-      - "postgres"
-      - "-c"
-      - "wal_level=logical"
-      - "-c"
-      - "log_statement=all"
-
-  debezium:
-    image: debezium/server:2.3
-    depends_on:
-      - db
-      - pubsub
-    networks:
-      - test
-    environment:
-      - DEBEZIUM_SINK_TYPE=pubsub
-      - DEBEZIUM_SINK_PUBSUB_PROJECT_ID=faceittha
-      - DEBEZIUM_SINK_PUBSUB_ADDRESS=pubsub:8085
-      - DEBEZIUM_SINK_EMULATOR_HOST=pubsub:8085
-      - PUBSUB_EMULATOR_HOST=pubsub:8085
-      - DEBEZIUM_SOURCE_CONNECTOR_CLASS=io.debezium.connector.postgresql.PostgresConnector
-      - DEBEZIUM_SOURCE_OFFSET_STORAGE_FILE_FILENAME=data/offsets.dat
-      - DEBEZIUM_SOURCE_OFFSET_FLUSH_INTERVAL_MS=0
-      - DEBEZIUM_SOURCE_DATABASE_HOSTNAME=db
-      - DEBEZIUM_SOURCE_DATABASE_PORT=5432
-      - DEBEZIUM_SOURCE_DATABASE_USER=postgres
-      - DEBEZIUM_SOURCE_DATABASE_PASSWORD=postgres
-      - DEBEZIUM_SOURCE_DATABASE_DBNAME=postgres
-      - DEBEZIUM_SOURCE_TOPIC_PREFIX=cdc
-      - DEBEZIUM_SOURCE_TABLE_INCLUDE_LIST=faceittha.users
-      - DEBEZIUM_SOURCE_PLUGIN_NAME=pgoutput
-      - DEBEZIUM_SOURCE_TOMBSTONES_ON_DELETE=false
+      PUID: 1000
+      PGID: 1000
+      MONGODB_REPLICA_SET_MODE: primary
+      MONGO_INITDB_ROOT_USERNAME: mongouser
+      MONGO_INITDB_ROOT_PASSWORD: mongopwd
+      MONGO_INITDB_DATABASE: faceittha
+      MONGODB_ADVERTISED_HOSTNAME: localhost
+    healthcheck:
+      test: |
+        test $$(mongosh --quiet -u mongouser -p mongopwd --eval "try { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'db' }] }).ok } catch (_) { rs.status().ok }") -eq 1
+      interval: 10s
+      start_period: 30s
+    command: ["--replSet", "rs0", "--keyFile", "/opt/keyfile/keyfile", "--bind_ip_all"]
 
   pubsub:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:latest
@@ -56,19 +37,63 @@ services:
       - --project=faceittha
       - --host-port=0.0.0.0:8085
 
+  pubsubsetup:
+    image: golang:1.20
+    networks:
+      - test
+    depends_on:
+      - pubsub
+    volumes:
+      - .:/go/src/app
+    working_dir: /go/src/app
+    environment:
+      - PUBSUB_EMULATOR_HOST=pubsub:8085
+      - CGO_ENABLED=0
+    command:
+      - /bin/bash
+      - -c
+      - |
+        echo "wating pubsub to be ready..."
+        go run -mod=vendor ./cmd/waitfor/main.go -host=pubsub -port=8085 || exit 1
+        echo "setup pubsub topics and subscriptions"
+        go run -mod=vendor ./cmd/pubsubsetup/main.go "faceittha,cdc.faceittha.users:worker.cdc.faceittha.users.sub,shared.faceittha.UserEvents:test.shared.facittha.UserEvents.sub" || exit 1
+        echo "dependencies configured, up and running"
+
+  debezium:
+    image: debezium/server:2.3
+    depends_on:
+      pubsubsetup:
+        condition: service_completed_successfully
+    networks:
+      - test
+    environment:
+      - QUARKUS_LOG_LEVEL=DEBUG
+      - DEBEZIUM_SINK_TYPE=pubsub
+      - DEBEZIUM_SINK_PUBSUB_PROJECT_ID=faceittha
+      - DEBEZIUM_SINK_PUBSUB_ADDRESS=pubsub:8085
+      - DEBEZIUM_SINK_EMULATOR_HOST=pubsub:8085
+      - PUBSUB_EMULATOR_HOST=pubsub:8085
+      - DEBEZIUM_SOURCE_CONNECTOR_CLASS=io.debezium.connector.mongodb.MongoDbConnector
+      - DEBEZIUM_SOURCE_MONGODB_CONNECTION_STRING=mongodb://mongouser:mongopwd@db:27017/faceittha?authSource=admin&readPreference=primary&ssl=false&replicaSet=rs0
+      - DEBEZIUM_SOURCE_OFFSET_STORAGE_FILE_FILENAME=data/offsets.dat
+      - DEBEZIUM_SOURCE_OFFSET_FLUSH_INTERVAL_MS=0
+      - DEBEZIUM_SOURCE_TOPIC_PREFIX=cdc
+      - DEBEZIUM_SOURCE_CAPTURE_MODE=change_streams_update_full_with_pre_image
+      - DEBEZIUM_SOURCE_COLLECTION_INCLUDE_LIST=faceittha.users
+      - DEBEZIUM_SOURCE_TOMBSTONES_ON_DELETE=false
+
   test:
     image: golang:1.20
     networks:
       - test
     depends_on:
       - db
-      - pubsub 
       - debezium
     volumes:
       - .:/go/src/app
     working_dir: /go/src/app
     environment:
-      - POSTGRESQL_URL=postgres://postgres:postgres@db:5432/postgres?sslmode=disable
+      - MONGODB_URL=mongodb://mongouser:mongopwd@db:27017/faceittha?authSource=admin&readPreference=primary&ssl=false&replicaSet=rs0
       - PUBSUB_EMULATOR_HOST=pubsub:8085
       - GOCOVERDIR=coverage
       - CGO_ENABLED=0
@@ -87,7 +112,7 @@ services:
         go build -buildvcs=false -cover -o ./bin/workercvg ./cmd/worker || exit 1
 
         echo "wating db to be ready..."
-        ./bin/waitforcvg -host=db -port=5432 || exit 1
+        ./bin/waitforcvg -host=db -port=27017 || exit 1
         echo "wating pubsub to be ready..."
         ./bin/waitforcvg -host=pubsub -port=8085 || exit 1
 

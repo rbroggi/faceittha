@@ -1,0 +1,10 @@
+[
+  {
+    "dropIndexes": "users",
+    "index": "idx_users_country"
+  },
+  {
+    "dropIndexes": "users",
+    "index": "idx_users_created_at"
+  }
+]

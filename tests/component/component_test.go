@@ -11,54 +11,57 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub"
-	"github.com/go-pg/pg/v10"
 	"github.com/golang/protobuf/proto"
 	v1 "github.com/rbroggi/faceittha/pkg/sdk/v1"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
 )
 
 // ComponentTestSuite is the test suite gathering structs and utilities for running the component tests.
 type ComponentTestSuite struct {
 	suite.Suite
-	db         *pg.DB
-	userClient v1.UserServiceClient
-	
-	ctx context.Context
-	cnl context.CancelFunc
+	db             *mongo.Client
+	userCollection *mongo.Collection
+	userClient     v1.UserServiceClient
+
+	ctx          context.Context
+	cnl          context.CancelFunc
 	pubsubClient *pubsub.Client
-	wg *sync.WaitGroup
-	events <-chan v1.UserEvent
+	wg           *sync.WaitGroup
+	events       <-chan v1.UserEvent
 
 	// internal state persisted cross method calls
-	createUserRequest *v1.CreateUserRequest
+	createUserRequest  *v1.CreateUserRequest
 	createUserResponse *v1.CreateUserResponse
 
-	updateUserRequest *v1.UpdateUserRequest
+	updateUserRequest  *v1.UpdateUserRequest
 	updateUserResponse *v1.UpdateUserResponse
 
-	deleteUserRequest *v1.RemoveUserRequest
+	deleteUserRequest  *v1.RemoveUserRequest
 	deleteUserResponse *v1.RemoveUserResponse
 }
 
 func (s *ComponentTestSuite) SetupTest() {
-	_, err := s.db.Exec("TRUNCATE TABLE faceittha.users")
+	_, err := s.db.Database("faceittha").Collection("users").DeleteMany(context.Background(), bson.D{})
 	s.Require().NoError(err)
 }
 
 func (s *ComponentTestSuite) TearDownSuite() {
 	// close the database connection after each test
-	s.Require().NoError(s.db.Close())
+	s.Require().NoError(s.db.Disconnect(context.Background()))
 	s.pubsubClient.Close()
 	s.cnl()
 	s.wg.Wait()
 }
 
 func TestComponentTestSuite(t *testing.T) {
-	postgresUrl := os.Getenv("POSTGRESQL_URL")
-	if postgresUrl == "" {
-		postgresUrl = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+	mongoUrl := os.Getenv("MONGODB_URL")
+	if mongoUrl == "" {
+		mongoUrl = "mongodb://mongouser:mongopwd@localhost:27017/faceittha?authSource=admin&readPreference=primary&ssl=false&replicaSet=rs0"
 	}
 
 	grpcServerAddress := os.Getenv("GRPC_SERVER_URL")
@@ -79,11 +82,12 @@ func TestComponentTestSuite(t *testing.T) {
 		require.NoError(t, os.Setenv("PUBSUB_EMULATOR_HOST", "localhost:8085"))
 	}
 
-	// Postgres connection (only for cleaning up data between tests)
-	opts, err := pg.ParseURL(postgresUrl)
-	require.NoError(t, err)
-	db := pg.Connect(opts)
-	require.NoError(t, db.Ping(context.Background()))
+	// MongoDB connection (only for cleaning up data between tests)
+	clientOptions := options.Client().ApplyURI(mongoUrl)
+	db, err := mongo.Connect(context.Background(), clientOptions)
+	timeoutCtx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+	require.NoError(t, db.Ping(timeoutCtx, nil))
+	collection := db.Database("faceittha").Collection("users")
 
 	// Create a gRPC connection to the server
 	conn, err := grpc.Dial(grpcServerAddress, grpc.WithInsecure())
@@ -110,16 +114,17 @@ func TestComponentTestSuite(t *testing.T) {
 			ch <- userEvent
 			msg.Ack()
 		})
-	} ()
+	}()
 
 	suite.Run(t, &ComponentTestSuite{
-		db:                 db,
-		userClient:         userSvcClient,
-		ctx:                ctx,
-		cnl:                cnl,
-		pubsubClient:       client,
-		wg:                 wg,
-		events:             ch,
+		db:             db,
+		userCollection: collection,
+		userClient:     userSvcClient,
+		ctx:            ctx,
+		cnl:            cnl,
+		pubsubClient:   client,
+		wg:             wg,
+		events:         ch,
 	})
 }
 
@@ -128,9 +133,8 @@ type when = func() *ComponentTestSuite
 type then = func() *ComponentTestSuite
 
 func (s *ComponentTestSuite) gherkin() (given, when, then) {
-	return func() *ComponentTestSuite { return s}, func() *ComponentTestSuite { return s}, func() *ComponentTestSuite { return s}
+	return func() *ComponentTestSuite { return s }, func() *ComponentTestSuite { return s }, func() *ComponentTestSuite { return s }
 }
-
 
 func (s *ComponentTestSuite) aCreateUserRequestIsIssued() *ComponentTestSuite {
 	var err error
@@ -162,7 +166,7 @@ func (s *ComponentTestSuite) theUserGetsUpdated() *ComponentTestSuite {
 func (s *ComponentTestSuite) aUserDeletionRequestIsIssued() *ComponentTestSuite {
 	var err error
 	s.deleteUserRequest = &v1.RemoveUserRequest{
-		Id:         s.createUserResponse.User.Id,
+		Id: s.createUserResponse.User.Id,
 	}
 	s.deleteUserResponse, err = s.userClient.RemoveUser(context.Background(), s.deleteUserRequest)
 	s.Require().NoError(err)
@@ -180,22 +184,21 @@ func (s *ComponentTestSuite) theUpdateResponseReflectsTheUpdateOperation() *Comp
 
 func (s *ComponentTestSuite) anExistingUser() *ComponentTestSuite {
 	return s.aCreateUserRequestIsIssued().
-			theCreateUserResponseContainsAValidUser()
+		theCreateUserResponseContainsAValidUser()
 }
 
 func (s *ComponentTestSuite) theCreateUserResponseContainsAValidUser() *ComponentTestSuite {
 	s.Require().NotNil(s.createUserResponse)
-	
+
 	s.Require().Equal(s.createUserRequest.FirstName, s.createUserResponse.User.FirstName)
 	s.Require().Equal(s.createUserRequest.LastName, s.createUserResponse.User.LastName)
 	s.Require().Equal(s.createUserRequest.Nickname, s.createUserResponse.User.Nickname)
 	s.Require().Equal(s.createUserRequest.Email, s.createUserResponse.User.Email)
 	s.Require().Equal(s.createUserRequest.Country, s.createUserResponse.User.Country)
 	s.Require().NotEmpty(s.createUserResponse, s.createUserResponse.User.Id)
-	
+
 	return s
 }
-
 
 func (s *ComponentTestSuite) listUsersContainsTheCreatedUser() *ComponentTestSuite {
 	listUsersResp, err := s.userClient.ListUsers(context.Background(), &v1.ListUsersRequest{})

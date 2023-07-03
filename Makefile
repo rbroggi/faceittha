@@ -1,5 +1,5 @@
-POSTGRES_HOST?=localhost
-POSTGRESQL_URL=postgres://postgres:postgres@$(POSTGRES_HOST):5432/postgres?sslmode=disable
+MONGODB_HOST?=localhost
+MONGODB_URL=mongodb://mongouser:mongopwd@$(MONGODB_HOST):27017/faceittha?authSource=admin&readPreference=primary&ssl=false&replicaSet=rs0
 MIGRATION_DIR="db/migrations"
 
 default: help
@@ -33,12 +33,12 @@ build:
 .PHONY: migrate_up
 ## migrate_up: initialises and run the migrations on the database.
 migrate_up:
-	docker run -v "$(PWD)/$(MIGRATION_DIR):/migrations" --network host migrate/migrate -path=/migrations/ -database $(POSTGRESQL_URL) up
+	docker run -v "$(PWD)/$(MIGRATION_DIR):/migrations" --network host migrate/migrate -path=/migrations/ -database $(MONGODB_URL) up
 	
 .PHONY: migrate_down
 ## migrate_down: tears down the database migrations.
 migrate_down:
-	docker run -v "$(PWD)/$(MIGRATION_DIR):/migrations" --network host migrate/migrate -path=/migrations/ -database $(POSTGRESQL_URL) down -all
+	docker run -v "$(PWD)/$(MIGRATION_DIR):/migrations" --network host migrate/migrate -path=/migrations/ -database $(MONGODB_URL) down -all
 
 .PHONY: dependencies_down
 ## dependencies_down: tears down the containerised environment necessary to run component-test against.

@@ -9,13 +9,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/go-pg/pg/v10"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	mongo2 "github.com/rbroggi/faceittha/internal/actors/mongo"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
 	grpcactor "github.com/rbroggi/faceittha/internal/actors/grpc"
-	"github.com/rbroggi/faceittha/internal/actors/postgres"
 	"github.com/rbroggi/faceittha/internal/core/usecase"
 	pb "github.com/rbroggi/faceittha/pkg/sdk/v1"
 	log "github.com/sirupsen/logrus"
@@ -43,27 +44,27 @@ func run() error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	url := os.Getenv("POSTGRESQL_URL")
+	url := os.Getenv("MONGODB_URL")
 	if url == "" {
-		url = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+		url = "mongodb://mongouser:mongopwd@localhost:27017/faceittha?authSource=admin&readPreference=primary&ssl=false&replicaSet=rs0"
 	}
-	pgopts, err := pg.ParseURL(url)
-	if err != nil {
-		log.WithError(err).Error("while parsing Postgres URL")
-		return err
-	}
-	db := pg.Connect(pgopts)
-	if err := db.Ping(context.Background()); err != nil {
+	// Set client options
+	clientOptions := options.Client().ApplyURI(url)
+	db, err := mongo.Connect(ctx, clientOptions)
+	if err := db.Ping(ctx, nil); err != nil {
 		log.WithError(err).Error("db does not appear to be reachable")
 		return err
 
 	}
-	pgDB, err := postgres.NewPostgresDB(postgres.PostgresDBArgs{DB: db})
+	defer db.Disconnect(ctx)
+	collection := db.Database("faceittha").Collection("users")
+
+	mongoActor, err := mongo2.NewMongoDB(mongo2.MongoDBArgs{UserCollection: collection})
 	if err != nil {
-		log.WithError(err).Error("error instantiating PostgresDB")
+		log.WithError(err).Error("could not initialize mongo actor")
 		return err
 	}
-	userSvcUsecase := usecase.NewUserService(usecase.UserServiceArgs{Repository: pgDB})
+	userSvcUsecase := usecase.NewUserService(usecase.UserServiceArgs{Repository: mongoActor})
 	userServer := grpcactor.NewUserService(grpcactor.UserServiceArgs{Usecase: userSvcUsecase})
 
 	mux := runtime.NewServeMux()
@@ -105,8 +106,8 @@ func run() error {
 	}()
 
 	log.
-		WithField("http-server-addr", *httpServerEndpoint). 
-		WithField("grpc-server-addr", *grpcServerEndpoint). 
+		WithField("http-server-addr", *httpServerEndpoint).
+		WithField("grpc-server-addr", *grpcServerEndpoint).
 		Info("servers up or soon to be up. listening to SIGTERM, SIGINT, SIGQUIT for stoping the server")
 
 	// Wait for signal

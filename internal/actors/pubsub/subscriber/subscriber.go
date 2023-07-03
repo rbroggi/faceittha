@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub"
-	"github.com/google/uuid"
 	"github.com/rbroggi/faceittha/internal/core/model"
 	"github.com/rbroggi/faceittha/internal/core/ports"
 
@@ -76,18 +75,34 @@ func decodeMsgIntoUserEvent(ctx context.Context, msg *pubsub.Message) (*model.Us
 		return nil, fmt.Errorf("json unmarshal error: %w", err)
 	}
 
-	if debeziumMsg.Payload.Source.Table != "users" {
+	var dbzBeforeUser *debeziumUser
+	if debeziumMsg.Payload.Before != nil {
+		dbzBeforeUser = new(debeziumUser)
+		if err := json.Unmarshal([]byte(*debeziumMsg.Payload.Before), &dbzBeforeUser); err != nil {
+			return nil, fmt.Errorf("json unmarshal error: %w", err)
+		}
+	}
+
+	var dbzAfterUser *debeziumUser
+	if debeziumMsg.Payload.After != nil {
+		dbzAfterUser = new(debeziumUser)
+		if err := json.Unmarshal([]byte(*debeziumMsg.Payload.After), &dbzAfterUser); err != nil {
+			return nil, fmt.Errorf("json unmarshal error: %w", err)
+		}
+	}
+
+	if debeziumMsg.Payload.Source.Collection != "users" {
 		return nil, ErrIgnoreEvent
 	}
 
 	userEvent := new(model.UserEvent)
 	userEvent.ID = msg.ID
-	userBefore, err := translateUserToModel(debeziumMsg.Payload.Before)
+	userBefore, err := translateUserToModel(dbzBeforeUser)
 	if err != nil {
 		return nil, ErrIgnoreEvent
 	}
 	userEvent.Before = userBefore
-	userAfter, err := translateUserToModel(debeziumMsg.Payload.After)
+	userAfter, err := translateUserToModel(dbzAfterUser)
 	if err != nil {
 		return nil, ErrIgnoreEvent
 	}
@@ -100,26 +115,22 @@ func translateUserToModel(dbzUser *debeziumUser) (*model.User, error) {
 	if dbzUser == nil {
 		return nil, nil
 	}
-	id, err := uuid.Parse(dbzUser.ID)
-	if err != nil {
-		return nil, err
-	}
 
 	deletedAt := time.Time{}
 	if dbzUser.DeletedAt != nil {
-		deletedAt = dbzUser.DeletedAt.Time
+		deletedAt = dbzUser.DeletedAt.Date.Time
 	}
 
 	return &model.User{
-		ID:           id,
+		ID:           dbzUser.ID.OID,
 		FirstName:    dbzUser.FirstName,
 		LastName:     dbzUser.LastName,
 		Nickname:     dbzUser.Nickname,
 		Email:        dbzUser.Email,
 		PasswordHash: dbzUser.PasswordHash,
 		Country:      dbzUser.Country,
-		CreatedAt:    dbzUser.CreatedAt.Time,
-		UpdatedAt:    dbzUser.UpdatedAt.Time,
+		CreatedAt:    dbzUser.CreatedAt.Date.Time,
+		UpdatedAt:    dbzUser.UpdatedAt.Date.Time,
 		DeletedAt:    deletedAt,
 	}, nil
 }
@@ -130,45 +141,53 @@ type debeziumMessage struct {
 }
 
 type payload struct {
-	Op string `json:"op"`
-	Source source `json:"source"`
-	Before *debeziumUser `json:"before"`
-	After  *debeziumUser `json:"after"`
+	Op     string  `json:"op"`
+	Source source  `json:"source"`
+	Before *string `json:"before"`
+	After  *string `json:"after"`
 }
 
 type source struct {
-	Schema string `json:"schema"`
-	Table  string `json:"table"`
+	Schema     string `json:"schema"`
+	Collection string `json:"collection"`
+}
+
+type debeziumMongoID struct {
+	OID string `json:"$oid"`
+}
+
+type debeziumUnixTime struct {
+	Date UnixTime `bson:"$date"`
 }
 
 type debeziumUser struct {
-	ID           string    `json:"id"`
-	FirstName    string    `json:"first_name"`
-	LastName     string    `json:"last_name"`
-	Nickname     string    `json:"nickname"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"password_hash"`
-	Country      string    `json:"country"`
-	CreatedAt    UnixTime `json:"created_at"`
-	UpdatedAt    UnixTime `json:"updated_at"`
-	DeletedAt    *UnixTime `json:"deleted_at"`
+	ID           debeziumMongoID   `json:"_id"`
+	FirstName    string            `json:"first_name"`
+	LastName     string            `json:"last_name"`
+	Nickname     string            `json:"nickname"`
+	Email        string            `json:"email"`
+	PasswordHash string            `json:"password_hash"`
+	Country      string            `json:"country"`
+	CreatedAt    debeziumUnixTime  `json:"created_at"`
+	UpdatedAt    debeziumUnixTime  `json:"updated_at"`
+	DeletedAt    *debeziumUnixTime `json:"deleted_at"`
 }
 
 // UnixTime is a custom type to allow us to redefine how to unmarshal from microseconds from epoch to time.Time
 type UnixTime struct {
-    time.Time
+	time.Time
 }
 
 func (ut *UnixTime) UnmarshalJSON(b []byte) error {
-    var timestamp int64
-    err := json.Unmarshal(b, &timestamp)
-    if err != nil {
-        return err
-    }
-    ut.Time = time.Unix(0, timestamp*1000).UTC()
-    return nil
+	var timestamp int64
+	err := json.Unmarshal(b, &timestamp)
+	if err != nil {
+		return err
+	}
+	ut.Time = time.Unix(0, timestamp*1000).UTC()
+	return nil
 }
 
 func (ut UnixTime) MarshalJSON() ([]byte, error) {
-    return []byte(strconv.FormatInt(ut.UnixNano()/1000, 10)), nil
+	return []byte(strconv.FormatInt(ut.UnixNano()/1000, 10)), nil
 }

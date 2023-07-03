@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/alexedwards/argon2id"
-	"github.com/google/uuid"
 	"github.com/rbroggi/faceittha/internal/core/model"
 	"github.com/rbroggi/faceittha/internal/core/ports"
 )
@@ -35,10 +34,9 @@ func (s *UserService) CreateUser(ctx context.Context, args model.CreateUserArgs)
 	hash, err := argon2id.CreateHash(args.Password, argon2id.DefaultParams)
 	if err != nil {
 		return nil, fmt.Errorf("error creating password hash: %w", err)
-	}	
+	}
 
 	user := &model.User{
-		ID:           uuid.New(),
 		FirstName:    args.FirstName,
 		LastName:     args.LastName,
 		Nickname:     args.Nickname,
@@ -57,12 +55,12 @@ func (s *UserService) CreateUser(ctx context.Context, args model.CreateUserArgs)
 // UpdateUser updates a user. It returns model.ErrNotFound if the ID does not correspond to an existing user.
 func (s *UserService) UpdateUser(ctx context.Context, args model.UpdateUserArgs) (*model.UpdateUserResponse, error) {
 	user := &model.User{
-		ID:           args.ID,
-		FirstName:    args.FirstName,
-		LastName:     args.LastName,
-		Nickname:     args.Nickname,
-		Email:        args.Email,
-		Country:      args.Country,
+		ID:        args.ID,
+		FirstName: args.FirstName,
+		LastName:  args.LastName,
+		Nickname:  args.Nickname,
+		Email:     args.Email,
+		Country:   args.Country,
 	}
 	if err := s.repository.UpdateUser(ctx, user); err != nil {
 		return nil, fmt.Errorf("error updating user: %w", err)

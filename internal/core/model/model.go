@@ -2,14 +2,12 @@ package model
 
 import (
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // User represents a user in the system.
 type User struct {
 	// ID unique identifier of the user.
-	ID uuid.UUID `json:"id"`
+	ID string `json:"id"`
 
 	// FirstName is the user first name.
 	FirstName string `json:"first_name"`
@@ -42,7 +40,7 @@ type User struct {
 // UserEvent collects a user change. It can represent creation, update and deletion of a user.
 type UserEvent struct {
 	// ID is the event id.
-	ID string 
+	ID string
 
 	// Before is the user state before the event. It will be nil in case of user-creations.
 	Before *User

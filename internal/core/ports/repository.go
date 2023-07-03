@@ -54,7 +54,7 @@ type ListUsersResult struct {
 // DeleteUserQuery
 type DeleteUserQuery struct {
 	// ID is the ID of the user to be deleted
-	ID uuid.UUID
+	ID string
 
 	// HardDelete will hard-delete the user, otherwise it's kept in soft-delete state for auditing
 	HardDelete bool

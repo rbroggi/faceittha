@@ -3,25 +3,19 @@ version: '3.8'
 services:
   db:
     ports:
-      - '5432:5432'
-    command:
-      - "postgres"
-      - "-c"
-      - "wal_level=logical"
-      - "-c"
-      - "log_statement=all"
+      - 27017:27017
 
   pubsub:
     ports:
       - '8085:8085'
 
   test:
-    command: 
+    command:
       - /bin/bash
       - -c
       - |
         echo "wating db to be ready..."
-        go run -mod=vendor ./cmd/waitfor/main.go -host=db -port=5432 || exit 1
+        go run -mod=vendor ./cmd/waitfor/main.go -host=db -port=27017 || exit 1
         echo "wating pubsub to be ready..."
         go run -mod=vendor ./cmd/waitfor/main.go -host=pubsub -port=8085 || exit 1
         echo "setup database by running migrations"

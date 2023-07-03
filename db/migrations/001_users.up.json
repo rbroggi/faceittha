@@ -1,0 +1,19 @@
+[{
+  "createIndexes": "users",
+  "indexes": [
+    {
+      "key": {
+        "country": 1
+      },
+      "name": "idx_users_country",
+      "background": true
+    },
+    {
+      "key": {
+        "created_at": 1
+      },
+      "name": "idx_users_created_at",
+      "background": true
+    }
+  ]
+}]

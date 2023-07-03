@@ -35,9 +35,6 @@ var (
 	_ = sort.Sort
 )
 
-// define the regex for a UUID once up-front
-var _user_uuidPattern = regexp.MustCompile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
-
 // Validate checks the field values on User with the rules defined in the proto
 // definition for this message. If any rules are violated, the first error
 // encountered is returned, or nil if there are no violations.
@@ -59,17 +56,7 @@ func (m *User) validate(all bool) error {
 
 	var errors []error
 
-	if err := m._validateUuid(m.GetId()); err != nil {
-		err = UserValidationError{
-			field:  "Id",
-			reason: "value must be a valid UUID",
-			cause:  err,
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
+	// no validation rules for Id
 
 	if len(m.GetFirstName()) > 256 {
 		err := UserValidationError{
@@ -240,14 +227,6 @@ func (m *User) _validateEmail(addr string) error {
 	}
 
 	return m._validateHostname(parts[1])
-}
-
-func (m *User) _validateUuid(uuid string) error {
-	if matched := _user_uuidPattern.MatchString(uuid); !matched {
-		return errors.New("invalid uuid format")
-	}
-
-	return nil
 }
 
 // UserMultiError is an error wrapping multiple validation errors returned by
@@ -1361,17 +1340,7 @@ func (m *UpdateUserRequest) validate(all bool) error {
 
 	var errors []error
 
-	if err := m._validateUuid(m.GetId()); err != nil {
-		err = UpdateUserRequestValidationError{
-			field:  "Id",
-			reason: "value must be a valid UUID",
-			cause:  err,
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
+	// no validation rules for Id
 
 	if m.GetFirstName() != "" {
 
@@ -1504,14 +1473,6 @@ func (m *UpdateUserRequest) _validateEmail(addr string) error {
 	}
 
 	return m._validateHostname(parts[1])
-}
-
-func (m *UpdateUserRequest) _validateUuid(uuid string) error {
-	if matched := _user_uuidPattern.MatchString(uuid); !matched {
-		return errors.New("invalid uuid format")
-	}
-
-	return nil
 }
 
 // UpdateUserRequestMultiError is an error wrapping multiple validation errors
@@ -1992,30 +1953,12 @@ func (m *RemoveUserRequest) validate(all bool) error {
 
 	var errors []error
 
-	if err := m._validateUuid(m.GetId()); err != nil {
-		err = RemoveUserRequestValidationError{
-			field:  "Id",
-			reason: "value must be a valid UUID",
-			cause:  err,
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
+	// no validation rules for Id
 
 	// no validation rules for HardDelete
 
 	if len(errors) > 0 {
 		return RemoveUserRequestMultiError(errors)
-	}
-
-	return nil
-}
-
-func (m *RemoveUserRequest) _validateUuid(uuid string) error {
-	if matched := _user_uuidPattern.MatchString(uuid); !matched {
-		return errors.New("invalid uuid format")
 	}
 
 	return nil

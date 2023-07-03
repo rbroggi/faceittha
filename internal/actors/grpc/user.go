@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rbroggi/faceittha/internal/core/model"
 	pb "github.com/rbroggi/faceittha/pkg/sdk/v1"
 	log "github.com/sirupsen/logrus"
@@ -50,7 +49,7 @@ func (u *UserService) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 
 	return &pb.CreateUserResponse{
 		User: &pb.User{
-			Id:        resp.User.ID.String(),
+			Id:        resp.User.ID,
 			FirstName: resp.User.FirstName,
 			LastName:  resp.User.LastName,
 			Nickname:  resp.User.Nickname,
@@ -95,14 +94,9 @@ func (u *UserService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 	if err := req.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
-	id, err := uuid.Parse(req.Id)
-	if err != nil {
-		log.WithError(err).Error("error invoking usecase RemoveUser")
-		return nil, status.Errorf(codes.InvalidArgument, "invalid uuid")
-	}
-	
+
 	updateResp, err := u.usecase.UpdateUser(ctx, model.UpdateUserArgs{
-		ID:        id,
+		ID:        req.Id,
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Nickname:  req.Nickname,
@@ -110,7 +104,7 @@ func (u *UserService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 		Country:   req.Country,
 	})
 	if err != nil {
-		if errors.Is(err,model.ErrNotFound) {
+		if errors.Is(err, model.ErrNotFound) {
 			log.Warn("attempt to update non-existing user")
 			return nil, status.Errorf(codes.NotFound, "user not found")
 		}
@@ -121,7 +115,7 @@ func (u *UserService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 
 	return &pb.UpdateUserResponse{
 		User: &pb.User{
-			Id:        updateResp.User.ID.String(),
+			Id:        updateResp.User.ID,
 			FirstName: updateResp.User.FirstName,
 			LastName:  updateResp.User.LastName,
 			Nickname:  updateResp.User.Nickname,
@@ -133,19 +127,14 @@ func (u *UserService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 	}, nil
 }
 
-// RemoveUser deletes a user. 
+// RemoveUser deletes a user.
 func (u *UserService) RemoveUser(ctx context.Context, req *pb.RemoveUserRequest) (*pb.RemoveUserResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
-	id, err := uuid.Parse(req.Id)
-	if err != nil {
-		log.WithError(err).Error("error invoking usecase RemoveUser")
-		return nil, status.Errorf(codes.InvalidArgument, "invalid uuid")
-	}
 
 	if err := u.usecase.DeleteUser(ctx, model.DeleteUserArgs{
-		ID:         id,
+		ID:         req.Id,
 		HardDelete: req.HardDelete,
 	}); err != nil {
 		log.WithError(err).Error("error invoking usecase RemoveUser")
@@ -165,7 +154,7 @@ type userServiceUsecase interface {
 
 	// ListUsers lists users.
 	ListUsers(ctx context.Context, args model.ListUsersArgs) (*model.ListUsersResponse, error)
-	
+
 	// DeleteUser deletes a user.
 	DeleteUser(ctx context.Context, args model.DeleteUserArgs) error
 }
@@ -180,7 +169,7 @@ func usersToProto(users []model.User) []*pb.User {
 
 func userToProto(user model.User) *pb.User {
 	return &pb.User{
-		Id:        user.ID.String(),
+		Id:        user.ID,
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 		Nickname:  user.Nickname,

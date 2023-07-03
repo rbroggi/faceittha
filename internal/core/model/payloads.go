@@ -63,7 +63,7 @@ type ListUsersResponse struct {
 // DeleteUserArgs contains the arguments for deleting a user.
 type DeleteUserArgs struct {
 	// ID is the id of the user to be deleted.
-	ID uuid.UUID
+	ID string
 
 	// HardDelete instructs the deletion to be a hard deletion (true). Otherwise, a soft-copy will be kept.
 	HardDelete bool
@@ -72,7 +72,7 @@ type DeleteUserArgs struct {
 // UpdateUserArgs contain the arguments of the UpdateUser method.
 type UpdateUserArgs struct {
 	// ID is the id of the user to be updated.
-	ID uuid.UUID
+	ID string
 
 	// FirstName is the user first name.
 	FirstName string

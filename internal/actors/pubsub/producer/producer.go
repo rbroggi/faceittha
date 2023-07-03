@@ -19,6 +19,7 @@ func NewProducer(topic *pubsub.Topic) (*Producer, error) {
 	}
 	return &Producer{topic: topic}, nil
 }
+
 // Producer is the pubsub producer of user events.
 type Producer struct {
 	topic *pubsub.Topic
@@ -46,7 +47,7 @@ func (p *Producer) Send(ctx context.Context, event model.UserEvent) error {
 func toProtoEvent(event model.UserEvent) *v1.UserEvent {
 	return &v1.UserEvent{
 		Before: toProtoUser(event.Before),
-		After: toProtoUser(event.After),
+		After:  toProtoUser(event.After),
 	}
 }
 
@@ -56,7 +57,7 @@ func toProtoUser(u *model.User) *v1.User {
 	}
 
 	return &v1.User{
-		Id:       u.ID.String(),
+		Id:        u.ID,
 		FirstName: u.FirstName,
 		LastName:  u.LastName,
 		Nickname:  u.Nickname,
