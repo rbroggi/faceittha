@@ -12,6 +12,8 @@ jobs:
     - uses: actions/checkout@v1
     - name: changing key file permission
       run: chmod 400 db/config/keyfile
+    - name: changing ownership as well
+      run: chown 999:999 db/config/keyfile
     - name: running CI
       run: docker-compose up
     - name: Dump docker logs on failure

@@ -32,11 +32,11 @@ func main() {
 	m, err := migrate.New(
 		migrationsDir,
 		url)
-	m.Log = &verboseLogger{}
-
 	if err != nil {
 		log.Fatalf("New error: %v", err)
 	}
+	m.Log = &verboseLogger{}
+
 	if *down {
 		if err := m.Down(); err != nil {
 			log.Fatalf("error migrating down: %v", err)
