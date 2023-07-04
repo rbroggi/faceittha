@@ -12,3 +12,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: running CI
       run: make ci
+    - name: dump docker logs
+      if: failure()
+      uses: actions/upload-artifact@v1
+      run: docker logs faceittha-debezium-1
