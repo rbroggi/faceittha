@@ -11,4 +11,4 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: running CI
-      run: docker-compose up
+      run: docker-compose up --no-TTY
