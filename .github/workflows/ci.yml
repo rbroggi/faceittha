@@ -11,7 +11,4 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: running CI
-      run: make ci
-    - name: dump docker logs
-      if: failure()
-      run: docker logs faceittha-debezium-1
+      run: docker-compose up --abort-on-container-exit
