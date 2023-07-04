@@ -51,7 +51,7 @@ func main() {
 type verboseLogger struct{}
 
 func (l *verboseLogger) Printf(format string, v ...interface{}) {
-	log.Printf(format, v)
+	log.Printf(format, v...)
 }
 
 func (l *verboseLogger) Verbose() bool {
