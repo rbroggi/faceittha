@@ -24,6 +24,34 @@ services:
       start_period: 30s
     command: ["--replSet", "rs0", "--keyFile", "/opt/keyfile/keyfile", "--bind_ip_all"]
 
+  waitfordb :
+    build:
+      dockerfile: Dockerfile.waitfor
+      context: ./
+    networks:
+      - test
+    depends_on:
+      db:
+        condition: service_started
+    command:
+      - -host=db
+      - -port=27017
+
+  dbmigrate:
+    build:
+      dockerfile: Dockerfile.migrate
+      context: ./
+    networks:
+      - test
+    depends_on:
+      waitfordb:
+        condition: service_completed_successfully
+    volumes:
+      - ./db/migrations:/go/src/app/db/migrations
+    working_dir: /go/src/app
+    environment:
+      - MONGODB_URL=mongodb://mongouser:mongopwd@db:27017/faceittha?authSource=admin&readPreference=primary&ssl=false&replicaSet=rs0
+
   pubsub:
     image: gcr.io/google.com/cloudsdktool/google-cloud-cli:latest
     networks:
@@ -37,27 +65,32 @@ services:
       - --project=faceittha
       - --host-port=0.0.0.0:8085
 
-  pubsubsetup:
-    image: golang:1.20
+  waitforpubsub:
+    build:
+      dockerfile: Dockerfile.waitfor
+      context: ./
     networks:
       - test
     depends_on:
-      - pubsub
-    volumes:
-      - .:/go/src/app
-    working_dir: /go/src/app
+      pubsub:
+        condition: service_started
+    command:
+      - -host=pubsub
+      - -port=8085
+
+  pubsubsetup:
+    build:
+      dockerfile: Dockerfile.pubsubsetup
+      context: ./
+    networks:
+      - test
+    depends_on:
+      waitforpubsub:
+        condition: service_completed_successfully
     environment:
       - PUBSUB_EMULATOR_HOST=pubsub:8085
-      - CGO_ENABLED=0
     command:
-      - /bin/bash
-      - -c
-      - |
-        echo "wating pubsub to be ready..."
-        go run -mod=vendor ./cmd/waitfor/main.go -host=pubsub -port=8085 || exit 1
-        echo "setup pubsub topics and subscriptions"
-        go run -mod=vendor ./cmd/pubsubsetup/main.go "faceittha,cdc.faceittha.users:worker.cdc.faceittha.users.sub,shared.faceittha.UserEvents:test.shared.facittha.UserEvents.sub" || exit 1
-        echo "dependencies configured, up and running"
+      - "faceittha,cdc.faceittha.users:worker.cdc.faceittha.users.sub,shared.faceittha.UserEvents:test.shared.facittha.UserEvents.sub"
 
   debezium:
     image: debezium/server:2.3
@@ -87,8 +120,12 @@ services:
     networks:
       - test
     depends_on:
-      - db
-      - debezium
+      dbmigrate:
+        condition: service_completed_successfully
+      pubsubsetup:
+        condition: service_completed_successfully
+      debezium:
+        condition: service_started
     volumes:
       - .:/go/src/app
     working_dir: /go/src/app
@@ -106,21 +143,7 @@ services:
 
         echo "building binaries with coverage support..."
         go build -buildvcs=false -cover -o ./bin/servercvg ./cmd/server || exit 1
-        go build -buildvcs=false -cover -o ./bin/waitforcvg ./cmd/waitfor || exit 1
-        go build -buildvcs=false -cover -o ./bin/migratecvg ./cmd/migrate || exit 1
-        go build -buildvcs=false -cover -o ./bin/pubsubsetupcvg ./cmd/pubsubsetup || exit 1
         go build -buildvcs=false -cover -o ./bin/workercvg ./cmd/worker || exit 1
-
-        echo "wating db to be ready..."
-        ./bin/waitforcvg -host=db -port=27017 || exit 1
-        echo "wating pubsub to be ready..."
-        ./bin/waitforcvg -host=pubsub -port=8085 || exit 1
-
-        echo "setup database by running migrations"
-        ./bin/migratecvg || exit 1
-
-        echo "setup pubusub - creationg of topics and subscriptions"
-        ./bin/pubsubsetupcvg "faceittha,cdc.faceittha.users:worker.cdc.faceittha.users.sub,shared.faceittha.UserEvents:test.shared.facittha.UserEvents.sub" || exit 1
 
         echo "starting unit-tests"
         go test -cover ./... -args -test.gocoverdir="$$PWD/coverage" || exit 1
@@ -135,6 +158,7 @@ services:
         ./bin/workercvg &> /tmp/worker.log &
         workerPID=$$(echo $$!)
         echo "worker PID: $$workerPID"
+        
         echo "wating server to be ready..."
         ./bin/waitforcvg -host=localhost -port=50051 || exit 1
         echo "wating worker to be ready..."
