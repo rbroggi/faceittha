@@ -37,7 +37,7 @@ flowchart TB
         httpJsonServer(HTTP/JSON Server Proxy);
         gRPCServer(gRPC Server);
     end
-    postgresDatabase[(Postgres Database)];
+    mongoDatabase[(MongoDB)];
     Debezium(Debezium);
     subgraph "Pubsub Broker";
         CDC(CDC Topic)
@@ -48,12 +48,14 @@ flowchart TB
     httpClient-->httpJsonServer;
     grpcClient-->gRPCServer;
     httpJsonServer-->|proxifies| gRPCServer;
-    gRPCServer-->postgresDatabase;
-    postgresDatabase-.->|replication-log|Debezium;
+    gRPCServer-->mongoDatabase;
+    mongoDatabase-.->|op-log/change streams|Debezium;
     Debezium-.->|publishes|CDC;
     CDC-.->|subscribes|WorkerPod;
     WorkerPod-.->|publishes|UserEvent;
 ```
+
+![](./doc/img/arch.png)
 
 ### PII and Password storage
 
@@ -116,11 +118,11 @@ I have opted for the CDC for the following reasons:
 │   ├── waitfor # utility executable used to wait for containers to be ready and listening on TCP ports
 │   └── worker # executable containing the pubsub CDC consumer
 ├── db
-│   └── migrations # SQL migration files - schema/index definitions on the Postgres database
+│   └── migrations # migration files - index/change stream definitions on the MongoDB database
 ├── internal # all internal functionality that is not supposed to be used outside the scope of the repo
 │   ├── actors # contains the protocol-specific code that interacts with `core`
 │   │   ├── grpc # contains the grpc server code
-│   │   ├── postgres
+│   │   ├── mongo
 │   │   └── pubsub
 │   │       ├── producer # contains the pubsub producer/publisher
 │   │       └── subscriber # contains the pubsub CDC subscriber
