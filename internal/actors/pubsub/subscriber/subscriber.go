@@ -49,6 +49,8 @@ func (s *Subscriber) Consume(ctx context.Context) error {
 			msg.Nack()
 			return
 		}
+		str, _ := json.Marshal(userEvent)
+		fmt.Printf("\n%s\n", str)
 
 		if err := s.userEventHandler.Handle(ctx, *userEvent); err != nil {
 			log.WithError(err).Error("error in user event handler")
@@ -137,7 +139,7 @@ func translateUserToModel(dbzUser *debeziumUser) (*model.User, error) {
 
 type debeziumMessage struct {
 	// payload is the debezium segment containing the payload.
-	Payload payload `json:"payload`
+	Payload payload `json:"payload"`
 }
 
 type payload struct {

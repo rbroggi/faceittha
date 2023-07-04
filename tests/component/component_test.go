@@ -5,6 +5,7 @@ package component
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -111,6 +112,14 @@ func TestComponentTestSuite(t *testing.T) {
 		subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 			var userEvent v1.UserEvent
 			require.NoError(t, proto.Unmarshal(msg.Data, &userEvent))
+			var userID string
+			if userEvent.Before != nil {
+				userID = userEvent.Before.Id
+			}
+			if userEvent.After != nil {
+				userID = userEvent.After.Id
+			}
+			fmt.Printf("received [user-id, before, after] [%s, %t, %t]\n", userID, userEvent.Before != nil, userEvent.After != nil)
 			ch <- userEvent
 			msg.Ack()
 		})
@@ -296,6 +305,7 @@ func (s *ComponentTestSuite) anEventForTheUserDeletionWillEventuallyBeProduced()
 		case event, more := <-s.events:
 			if !more {
 				s.Fail("channel closed before reaching desired event")
+				return s
 			}
 
 			// success
@@ -306,6 +316,7 @@ func (s *ComponentTestSuite) anEventForTheUserDeletionWillEventuallyBeProduced()
 		case <-timeoutCh:
 			// Timeout occurred
 			s.Fail("timeout before receiving creation event")
+			return s
 		}
 	}
 }

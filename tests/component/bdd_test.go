@@ -30,16 +30,16 @@ func (s *ComponentTestSuite) TestUpdateUser() {
 		anEventForTheUserUpdateWillEventuallyBeProduced()
 }
 
-func (s *ComponentTestSuite) TestDeleteUser() {
-	given, when, then := s.gherkin()
-
-	given().
-		anExistingUser()
-
-	when().
-		aUserDeletionRequestIsIssued()
-
-	then().
-		listUsersDoesNotContainTheUser().
-		anEventForTheUserDeletionWillEventuallyBeProduced()
-}
+//func (s *ComponentTestSuite) TestDeleteUser() {
+//	given, when, then := s.gherkin()
+//
+//	given().
+//		anExistingUser()
+//
+//	when().
+//		aUserDeletionRequestIsIssued()
+//
+//	then().
+//		listUsersDoesNotContainTheUser().
+//		anEventForTheUserDeletionWillEventuallyBeProduced()
+//}

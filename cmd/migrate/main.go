@@ -32,6 +32,8 @@ func main() {
 	m, err := migrate.New(
 		migrationsDir,
 		url)
+	m.Log = &verboseLogger{}
+
 	if err != nil {
 		log.Fatalf("New error: %v", err)
 	}
@@ -44,4 +46,14 @@ func main() {
 			log.Fatalf("error migrating up: %v", err)
 		}
 	}
+}
+
+type verboseLogger struct{}
+
+func (l *verboseLogger) Printf(format string, v ...interface{}) {
+	log.Printf(format, v)
+}
+
+func (l *verboseLogger) Verbose() bool {
+	return true
 }
