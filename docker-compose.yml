@@ -143,6 +143,7 @@ services:
 
         echo "building binaries with coverage support..."
         go build -buildvcs=false -cover -o ./bin/servercvg ./cmd/server || exit 1
+        go build -buildvcs=false -cover -o ./bin/waitforcvg ./cmd/waitfor || exit 1
         go build -buildvcs=false -cover -o ./bin/workercvg ./cmd/worker || exit 1
 
         echo "starting unit-tests"
