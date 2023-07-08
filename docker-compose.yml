@@ -8,8 +8,8 @@ services:
     restart: always
     networks:
       - test
-    volumes:
-      - ./db/config/keyfile:/opt/keyfile/keyfile:ro
+#    volumes:
+#      - ./db/config/keyfile:/opt/keyfile/keyfile:ro
 #      - ./db/init.js:/docker-entrypoint-initdb.d/init.js:ro
     environment:
       MONGODB_REPLICA_SET_MODE: primary
