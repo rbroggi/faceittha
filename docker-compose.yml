@@ -2,7 +2,9 @@
 version: '3.8'
 services:
   db:
-    image: mongo
+    build:
+      dockerfile: Dockerfile.db
+      context: ./
     restart: always
     networks:
       - test
@@ -10,8 +12,6 @@ services:
       - ./db/config/keyfile:/opt/keyfile/keyfile:ro
 #      - ./db/init.js:/docker-entrypoint-initdb.d/init.js:ro
     environment:
-      PUID: 1000
-      PGID: 1000
       MONGODB_REPLICA_SET_MODE: primary
       MONGO_INITDB_ROOT_USERNAME: mongouser
       MONGO_INITDB_ROOT_PASSWORD: mongopwd
