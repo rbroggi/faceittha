@@ -1,4 +1,4 @@
 FROM mongo
-COPY ./db/config/keyfile /opt/keyfile
-RUN chown -R mongodb:mongodb /opt/keyfile
+COPY ./db/config/ /opt/keyfile/
+RUN chown -R mongodb:mongodb /opt/keyfile/
 RUN chmod 400 /opt/keyfile/keyfile
